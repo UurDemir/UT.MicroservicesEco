@@ -1,0 +1,21 @@
+# Kibana 8.17 — bind-mounted config for Aspire (resource name "elasticsearch" = Docker DNS name).
+# Elasticsearch in this stack uses xpack.security.enabled=false (no Kibana username/password).
+# See https://www.elastic.co/guide/en/kibana/8.17/settings.html
+
+server.host: "0.0.0.0"
+server.shutdownTimeout: "5s"
+
+# Required: Kibana must know where Elasticsearch listens on the internal Docker network.
+elasticsearch.hosts: ["http://elasticsearch:9200"]
+
+# Timeouts for slow single-node dev clusters
+elasticsearch.requestTimeout: 120000
+elasticsearch.pingTimeout: 30000
+
+# Stack Monitoring when ES runs in a container (matches Elastic Docker image defaults)
+monitoring.ui.container.elasticsearch.enabled: true
+
+# Less noisy local dev (optional)
+telemetry.optIn: false
+
+logging.root.level: info
