@@ -85,6 +85,32 @@ jobs:
           base_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
           PY
 
+      - name: Write reverse-proxy TLS PEMs from repository secrets
+        env:
+          SSL_FULLCHAIN_PEM: ${{ secrets.REVERSE_PROXY_SSL_FULLCHAIN_PEM }}
+          SSL_PRIVATE_KEY_PEM: ${{ secrets.REVERSE_PROXY_SSL_PRIVATE_KEY_PEM }}
+        run: |
+          python3 << 'PY'
+          import os
+          from pathlib import Path
+
+          fullchain = os.environ.get("SSL_FULLCHAIN_PEM", "").strip()
+          privkey = os.environ.get("SSL_PRIVATE_KEY_PEM", "").strip()
+          if not fullchain or not privkey:
+              raise SystemExit(
+                  "Set repository secrets REVERSE_PROXY_SSL_FULLCHAIN_PEM and "
+                  "REVERSE_PROXY_SSL_PRIVATE_KEY_PEM to the full PEM text (multiline). "
+                  "They are written to compose-bundle/ssl/ before rsync (not committed)."
+              )
+
+          ssl_dir = Path(os.environ["GITHUB_WORKSPACE"]) / "compose-bundle" / "ssl"
+          ssl_dir.mkdir(parents=True, exist_ok=True)
+          (ssl_dir / "fullchain.pem").write_text(fullchain + "\n", encoding="utf-8")
+          (ssl_dir / "privkey.pem").write_text(privkey + "\n", encoding="utf-8")
+          for p in (ssl_dir / "fullchain.pem", ssl_dir / "privkey.pem"):
+              p.chmod(0o600)
+          PY
+
       - name: Prepare SSH (password only)
         env:
           SSH_HOST: ${{ secrets.SSH_HOST }}
