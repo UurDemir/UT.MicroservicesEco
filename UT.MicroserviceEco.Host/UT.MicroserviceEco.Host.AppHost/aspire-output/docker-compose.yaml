@@ -154,7 +154,7 @@ services:
       AUTHDB_JDBCCONNECTIONSTRING: "jdbc:postgresql://postgres:5432/authdb"
       AUTHDB_DATABASENAME: "authdb"
       ConnectionStrings__elasticsearch: "http://elastic:${ELASTICSEARCH_PASSWORD}@elasticsearch:9200"
-      OTEL_EXPORTER_OTLP_ENDPOINT: "http://compose-dashboard:18889"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector:4317"
       OTEL_EXPORTER_OTLP_PROTOCOL: "grpc"
       OTEL_SERVICE_NAME: "authservice"
       Jwt__Key: "${JWT_KEY}"
@@ -184,7 +184,7 @@ services:
       PRODUCTDB_JDBCCONNECTIONSTRING: "jdbc:postgresql://postgres:5432/productdb"
       PRODUCTDB_DATABASENAME: "productdb"
       ConnectionStrings__elasticsearch: "http://elastic:${ELASTICSEARCH_PASSWORD}@elasticsearch:9200"
-      OTEL_EXPORTER_OTLP_ENDPOINT: "http://compose-dashboard:18889"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector:4317"
       OTEL_EXPORTER_OTLP_PROTOCOL: "grpc"
       OTEL_SERVICE_NAME: "productservice"
     expose:
@@ -216,7 +216,7 @@ services:
       services__productservice__http__0: "http://productservice:${PRODUCTSERVICE_PORT}"
       PRODUCTSERVICE_HTTPS: "https://productservice:${PRODUCTSERVICE_PORT}"
       ConnectionStrings__elasticsearch: "http://elastic:${ELASTICSEARCH_PASSWORD}@elasticsearch:9200"
-      OTEL_EXPORTER_OTLP_ENDPOINT: "http://compose-dashboard:18889"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector:4317"
       OTEL_EXPORTER_OTLP_PROTOCOL: "grpc"
       OTEL_SERVICE_NAME: "basketservice"
     expose:
@@ -256,7 +256,7 @@ services:
       RABBITMQ_PASSWORD: "${RABBITMQ_PASSWORD}"
       RABBITMQ_URI: "amqp://guest:${RABBITMQ_PASSWORD}@rabbitmq:5672"
       ConnectionStrings__elasticsearch: "http://elastic:${ELASTICSEARCH_PASSWORD}@elasticsearch:9200"
-      OTEL_EXPORTER_OTLP_ENDPOINT: "http://compose-dashboard:18889"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector:4317"
       OTEL_EXPORTER_OTLP_PROTOCOL: "grpc"
       OTEL_SERVICE_NAME: "orderservice"
     expose:
@@ -293,7 +293,7 @@ services:
       RABBITMQ_PASSWORD: "${RABBITMQ_PASSWORD}"
       RABBITMQ_URI: "amqp://guest:${RABBITMQ_PASSWORD}@rabbitmq:5672"
       ConnectionStrings__elasticsearch: "http://elastic:${ELASTICSEARCH_PASSWORD}@elasticsearch:9200"
-      OTEL_EXPORTER_OTLP_ENDPOINT: "http://compose-dashboard:18889"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector:4317"
       OTEL_EXPORTER_OTLP_PROTOCOL: "grpc"
       OTEL_SERVICE_NAME: "deliveryservice"
     expose:
@@ -331,7 +331,7 @@ services:
       services__deliveryservice__http__0: "http://deliveryservice:${DELIVERYSERVICE_PORT}"
       DELIVERYSERVICE_HTTPS: "https://deliveryservice:${DELIVERYSERVICE_PORT}"
       ConnectionStrings__elasticsearch: "http://elastic:${ELASTICSEARCH_PASSWORD}@elasticsearch:9200"
-      OTEL_EXPORTER_OTLP_ENDPOINT: "http://compose-dashboard:18889"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector:4317"
       OTEL_EXPORTER_OTLP_PROTOCOL: "grpc"
       OTEL_SERVICE_NAME: "apigateway"
       Jwt__Key: "${JWT_KEY}"
@@ -362,7 +362,7 @@ services:
       APIGATEWAY_HTTP: "http://apigateway:8080"
       services__apigateway__http__0: "http://apigateway:8080"
       APIGATEWAY_HTTPS: "https://apigateway:8080"
-      OTEL_EXPORTER_OTLP_ENDPOINT: "http://compose-dashboard:18889"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector:4317"
       OTEL_EXPORTER_OTLP_PROTOCOL: "grpc"
       OTEL_SERVICE_NAME: "ecommerce-web"
     expose:

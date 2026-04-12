@@ -157,6 +157,7 @@ var authService = builder.AddProject<Projects.UT_MicroserviceEco_AuthService>("a
     .WithOtlpExporter(otelCollector)
     .PublishAsDockerComposeService((_, s) =>
     {
+        DockerComposePublishingExtensions.ConfigurePublishedComposeOtelExporter(s);
         DockerComposePublishingExtensions.EnsureComposeDependsOn(s, "postgres");
         s.Environment["Jwt__Key"] = "${JWT_KEY}";
     });
@@ -167,7 +168,11 @@ var productService = builder.AddProject<Projects.UT_MicroserviceEco_ProductServi
     .WaitFor(postgres)
     .WaitFor(elasticsearch)
     .WithOtlpExporter(otelCollector)
-    .PublishAsDockerComposeService((_, s) => DockerComposePublishingExtensions.EnsureComposeDependsOn(s, "postgres"));
+    .PublishAsDockerComposeService((_, s) =>
+    {
+        DockerComposePublishingExtensions.ConfigurePublishedComposeOtelExporter(s);
+        DockerComposePublishingExtensions.EnsureComposeDependsOn(s, "postgres");
+    });
 
 var basketService = builder.AddProject<Projects.UT_MicroserviceEco_BasketService>("basketservice")
     .WithReference(basketDb)
@@ -177,7 +182,11 @@ var basketService = builder.AddProject<Projects.UT_MicroserviceEco_BasketService
     .WaitFor(productService)
     .WaitFor(elasticsearch)
     .WithOtlpExporter(otelCollector)
-    .PublishAsDockerComposeService((_, s) => DockerComposePublishingExtensions.EnsureComposeDependsOn(s, "postgres", "productservice"));
+    .PublishAsDockerComposeService((_, s) =>
+    {
+        DockerComposePublishingExtensions.ConfigurePublishedComposeOtelExporter(s);
+        DockerComposePublishingExtensions.EnsureComposeDependsOn(s, "postgres", "productservice");
+    });
 
 var orderService = builder.AddProject<Projects.UT_MicroserviceEco_OrderService>("orderservice")
     .WithReference(orderDb)
@@ -188,7 +197,11 @@ var orderService = builder.AddProject<Projects.UT_MicroserviceEco_OrderService>(
     .WaitFor(rabbitmq)
     .WaitFor(elasticsearch)
     .WithOtlpExporter(otelCollector)
-    .PublishAsDockerComposeService((_, s) => DockerComposePublishingExtensions.EnsureComposeDependsOn(s, "postgres", "rabbitmq"));
+    .PublishAsDockerComposeService((_, s) =>
+    {
+        DockerComposePublishingExtensions.ConfigurePublishedComposeOtelExporter(s);
+        DockerComposePublishingExtensions.EnsureComposeDependsOn(s, "postgres", "rabbitmq");
+    });
 
 var deliveryService = builder.AddProject<Projects.UT_MicroserviceEco_DeliveryService>("deliveryservice")
     .WithReference(deliveryDb)
@@ -198,7 +211,11 @@ var deliveryService = builder.AddProject<Projects.UT_MicroserviceEco_DeliverySer
     .WaitFor(rabbitmq)
     .WaitFor(elasticsearch)
     .WithOtlpExporter(otelCollector)
-    .PublishAsDockerComposeService((_, s) => DockerComposePublishingExtensions.EnsureComposeDependsOn(s, "postgres", "rabbitmq"));
+    .PublishAsDockerComposeService((_, s) =>
+    {
+        DockerComposePublishingExtensions.ConfigurePublishedComposeOtelExporter(s);
+        DockerComposePublishingExtensions.EnsureComposeDependsOn(s, "postgres", "rabbitmq");
+    });
 
 var apiGateway = builder.AddProject<Projects.UT_MicroserviceEco_ApiGateway>("apigateway")
     .WithReference(authService)
@@ -216,6 +233,7 @@ var apiGateway = builder.AddProject<Projects.UT_MicroserviceEco_ApiGateway>("api
     .WithOtlpExporter(otelCollector)
     .PublishAsDockerComposeService((_, service) =>
     {
+        DockerComposePublishingExtensions.ConfigurePublishedComposeOtelExporter(service);
         service.Environment["HTTP_PORTS"] = "8080";
         service.Environment["Jwt__Key"] = "${JWT_KEY}";
         service.Expose.Clear();
@@ -232,6 +250,7 @@ var ecommerceWeb = builder.AddJavaScriptApp("ecommerce-web", ecommerceWebPath, r
     .WithExternalHttpEndpoints()
     .PublishAsDockerComposeService((_, service) =>
     {
+        DockerComposePublishingExtensions.ConfigurePublishedComposeOtelExporter(service);
         service.Ports.Clear();
         service.Environment["PORT"] = "80";
         service.Expose.Clear();
