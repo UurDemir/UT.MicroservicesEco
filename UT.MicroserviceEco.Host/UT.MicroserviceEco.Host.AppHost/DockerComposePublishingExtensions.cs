@@ -6,7 +6,7 @@ namespace UT.MicroserviceEco.Host.AppHost;
 internal static class DockerComposePublishingExtensions
 {
     /// <summary>
-    /// When publishing to Docker Compose, do not publish container ports to the host (access via Traefik on :80 instead).
+    /// When publishing to Docker Compose, do not publish container ports to the host (access via reverse-proxy on :80 / :443 instead).
     /// </summary>
     public static IResourceBuilder<T> PublishWithoutPublishedPorts<T>(this IResourceBuilder<T> builder)
         where T : IComputeResource =>

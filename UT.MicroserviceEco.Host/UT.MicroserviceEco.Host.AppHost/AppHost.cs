@@ -5,6 +5,7 @@ using UT.MicroserviceEco.Host.AppHost;
 
 var builder = DistributedApplication.CreateBuilder(args);
 Func<string, string> obsPath = relative => Path.GetFullPath(relative, builder.AppHostDirectory);
+Directory.CreateDirectory(obsPath("Observability/reverse-proxy/ssl"));
 
 builder.AddDockerComposeEnvironment("compose")
     .WithDashboard();
@@ -211,20 +212,20 @@ var ecommerceWeb = builder.AddJavaScriptApp("ecommerce-web", ecommerceWebPath, r
         service.Environment["APIGATEWAY_HTTPS"] = "https://apigateway:8080";
     });
 
-builder.AddContainer("traefik", "traefik", "v3.3")
-    .WithArgs("--configFile=/etc/traefik/traefik.yml")
-    .WithContainerFiles("/etc/traefik", [
+builder.AddContainer("reverse-proxy", "nginx", "1.27-alpine")
+    .WithContainerFiles("/etc/nginx/conf.d", [
         new ContainerFile
         {
-            Name = "traefik.yml",
-            SourcePath = obsPath("Observability/traefik/traefik.yml"),
+            Name = "default.conf",
+            SourcePath = obsPath("Observability/reverse-proxy/default.conf"),
+        },
+        new ContainerFile
+        {
+            Name = "ssl-params.conf",
+            SourcePath = obsPath("Observability/reverse-proxy/ssl-params.conf"),
         },
     ])
-    .WithContainerFiles(
-        "/etc/traefik/dynamic",
-        ContainerDirectory.GetFileSystemItemsFromPath(
-            obsPath("Observability/traefik/dynamic"),
-            searchOptions: SearchOption.AllDirectories))
+    .WithBindMount(obsPath("Observability/reverse-proxy/ssl"), "/etc/nginx/ssl", isReadOnly: true)
     .WaitFor(jaeger)
     .WaitFor(prometheus)
     .WaitFor(grafana)
@@ -232,6 +233,7 @@ builder.AddContainer("traefik", "traefik", "v3.3")
     .WaitFor(apiGateway)
     .WaitFor(ecommerceWeb)
     .WithHttpEndpoint(targetPort: 80, port: 80)
+    .WithHttpsEndpoint(targetPort: 443, port: 443)
     .WithExternalHttpEndpoints();
 
 builder.Build().Run();
