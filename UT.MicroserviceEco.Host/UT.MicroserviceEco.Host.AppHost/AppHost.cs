@@ -1,16 +1,20 @@
+using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
+using Aspire.Hosting.Docker;
 using UT.MicroserviceEco.Host.AppHost;
 
 var builder = DistributedApplication.CreateBuilder(args);
 Func<string, string> obsPath = relative => Path.GetFullPath(relative, builder.AppHostDirectory);
 
-builder.AddDockerComposeEnvironment("compose");
+builder.AddDockerComposeEnvironment("compose")
+    .WithDashboard();
 //var k8s = builder.AddKubernetesEnvironment("k8s");
 
 var jaeger = builder.AddContainer("jaeger", "jaegertracing/all-in-one", "1.52")
     .WithEnvironment("COLLECTOR_OTLP_ENABLED", "true")
     .WithHttpEndpoint(targetPort: 16686, port: 16686)
     .WithExternalHttpEndpoints()
+    .PublishWithoutPublishedPorts()
     .WithUrls(c =>
     {
         foreach (var url in c.Urls)
@@ -36,7 +40,10 @@ var otelCollector = builder.AddContainer("otel-collector", "otel/opentelemetry-c
     .WithEndpoint(targetPort: 8889, port: 8889, scheme: "http", name: "metrics");
 
 var prometheus = builder.AddContainer("prometheus", "prom/prometheus", "v2.52.0")
-    .WithArgs("--config.file=/etc/prometheus/prometheus.yml", "--storage.tsdb.path=/prometheus")
+    .WithArgs(
+        "--config.file=/etc/prometheus/prometheus.yml",
+        "--storage.tsdb.path=/prometheus",
+        "--web.external-url=https://prometheus.ugurdemir.dev/")
     .WithContainerFiles("/etc/prometheus", [
         new ContainerFile
         {
@@ -48,6 +55,7 @@ var prometheus = builder.AddContainer("prometheus", "prom/prometheus", "v2.52.0"
     .WaitFor(otelCollector)
     .WithHttpEndpoint(targetPort: 9090, port: 9090)
     .WithExternalHttpEndpoints()
+    .PublishWithoutPublishedPorts()
     .WithUrls(c =>
     {
         foreach (var url in c.Urls)
@@ -59,9 +67,11 @@ var prometheus = builder.AddContainer("prometheus", "prom/prometheus", "v2.52.0"
         }
     });
 
-builder.AddContainer("grafana", "grafana/grafana", "11.0.0")
+var grafana = builder.AddContainer("grafana", "grafana/grafana", "11.0.0")
     .WithEnvironment("GF_SECURITY_ADMIN_USER", "admin")
     .WithEnvironment("GF_SECURITY_ADMIN_PASSWORD", "admin")
+    .WithEnvironment("GF_SERVER_ROOT_URL", "https://grafana.ugurdemir.dev/")
+    .WithEnvironment("GF_SERVER_DOMAIN", "grafana.ugurdemir.dev")
     .WithContainerFiles(
         "/etc/grafana/provisioning",
         ContainerDirectory.GetFileSystemItemsFromPath(
@@ -71,6 +81,7 @@ builder.AddContainer("grafana", "grafana/grafana", "11.0.0")
     .WaitFor(prometheus)
     .WithHttpEndpoint(targetPort: 3000, port: 3000)
     .WithExternalHttpEndpoints()
+    .PublishWithoutPublishedPorts()
     .WithUrls(c =>
     {
         foreach (var url in c.Urls)
@@ -97,7 +108,7 @@ var elasticsearch = builder.AddElasticsearch("elasticsearch")
         }
     });
 
-builder.AddContainer("kibana", "docker.elastic.co/kibana/kibana", "8.17.3")
+var kibana = builder.AddContainer("kibana", "docker.elastic.co/kibana/kibana", "8.17.3")
     .WaitFor(elasticsearch)
     .WithReference(elasticsearch)
     // Explicit hosts: kibana.yml must match; env also sets JSON array for the Docker entrypoint.
@@ -112,6 +123,7 @@ builder.AddContainer("kibana", "docker.elastic.co/kibana/kibana", "8.17.3")
     .WithVolume("kibana-data", "/usr/share/kibana/data")
     .WithHttpEndpoint(targetPort: 5601, port: 5601)
     .WithExternalHttpEndpoints()
+    .PublishWithoutPublishedPorts()
     .WithUrls(c =>
     {
         foreach (var url in c.Urls)
@@ -174,13 +186,49 @@ var apiGateway = builder.AddProject<Projects.UT_MicroserviceEco_ApiGateway>("api
     .WithReference(deliveryService)
     .WithReference(elasticsearch)
     .WaitFor(elasticsearch)
-    .WithOtlpExporter(otelCollector);
+    .WithOtlpExporter(otelCollector)
+    .PublishAsDockerComposeService((_, service) =>
+    {
+        service.Environment["HTTP_PORTS"] = "8080";
+        service.Expose.Clear();
+        service.Expose.Add("8080");
+    });
 
 var ecommerceWebPath = Path.GetFullPath(Path.Combine(builder.AppHostDirectory, "..", "..", "ecommerce-web"));
-builder.AddJavaScriptApp("ecommerce-web", ecommerceWebPath, runScriptName: "start")
+var ecommerceWeb = builder.AddJavaScriptApp("ecommerce-web", ecommerceWebPath, runScriptName: "start")
     .WithHttpEndpoint(port: 4200, env: "PORT")
     .WithReference(apiGateway)
     .WaitFor(apiGateway)
+    .WithExternalHttpEndpoints()
+    .PublishAsDockerComposeService((_, service) =>
+    {
+        service.Ports.Clear();
+        service.Environment["APIGATEWAY_HTTP"] = "http://apigateway:8080";
+        service.Environment["services__apigateway__http__0"] = "http://apigateway:8080";
+        service.Environment["APIGATEWAY_HTTPS"] = "https://apigateway:8080";
+    });
+
+builder.AddContainer("traefik", "traefik", "v3.3")
+    .WithArgs("--configFile=/etc/traefik/traefik.yml")
+    .WithContainerFiles("/etc/traefik", [
+        new ContainerFile
+        {
+            Name = "traefik.yml",
+            SourcePath = obsPath("Observability/traefik/traefik.yml"),
+        },
+    ])
+    .WithContainerFiles(
+        "/etc/traefik/dynamic",
+        ContainerDirectory.GetFileSystemItemsFromPath(
+            obsPath("Observability/traefik/dynamic"),
+            searchOptions: SearchOption.AllDirectories))
+    .WaitFor(jaeger)
+    .WaitFor(prometheus)
+    .WaitFor(grafana)
+    .WaitFor(kibana)
+    .WaitFor(apiGateway)
+    .WaitFor(ecommerceWeb)
+    .WithHttpEndpoint(targetPort: 80, port: 80)
     .WithExternalHttpEndpoints();
 
 builder.Build().Run();

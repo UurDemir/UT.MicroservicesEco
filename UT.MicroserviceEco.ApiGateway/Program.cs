@@ -35,6 +35,17 @@ builder.Services.AddReverseProxy()
 builder.Services.AddECommerceMeter();
 builder.Services.AddSingleton<GatewayMetrics>();
 
+builder.Services.AddCors(options =>
+{
+    options.AddDefaultPolicy(policy =>
+        policy.WithOrigins(
+                "https://ecommerce.ugurdemir.dev",
+                "http://localhost:4200",
+                "http://127.0.0.1:4200")
+            .AllowAnyHeader()
+            .AllowAnyMethod());
+});
+
 var app = builder.Build();
 
 if (app.Environment.IsDevelopment())
@@ -44,6 +55,8 @@ if (app.Environment.IsDevelopment())
 
 app.UseCorrelationId();
 app.UseDefaultSerilogRequestLogging();
+
+app.UseCors();
 
 app.UseAuthentication();
 app.UseAuthorization();

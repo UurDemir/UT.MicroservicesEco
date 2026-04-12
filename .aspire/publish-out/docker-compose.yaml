@@ -1,0 +1,374 @@
+services:
+  compose-dashboard:
+    image: "mcr.microsoft.com/dotnet/nightly/aspire-dashboard:latest"
+    ports:
+      - "18888"
+    expose:
+      - "18889"
+      - "18890"
+    networks:
+      - "aspire"
+    restart: "always"
+  jaeger:
+    image: "jaegertracing/all-in-one:1.52"
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    ports:
+      - "16686:16686"
+    networks:
+      - "aspire"
+  otel-collector:
+    image: "otel/opentelemetry-collector-contrib:0.102.1"
+    command:
+      - "--config=/etc/otelcol/config.yaml"
+    expose:
+      - "4317"
+      - "8889"
+    depends_on:
+      jaeger:
+        condition: "service_started"
+    networks:
+      - "aspire"
+    configs:
+      - source: "otel-collector__etc_otelcol_config.yaml"
+        target: "/etc/otelcol/config.yaml"
+        mode: 0644
+  prometheus:
+    image: "prom/prometheus:v2.52.0"
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+    ports:
+      - "9090:9090"
+    volumes:
+      - type: "volume"
+        target: "/prometheus"
+        source: "prometheus-tsdb"
+        read_only: false
+    depends_on:
+      otel-collector:
+        condition: "service_started"
+    networks:
+      - "aspire"
+    configs:
+      - source: "prometheus__etc_prometheus_prometheus.yml"
+        target: "/etc/prometheus/prometheus.yml"
+        mode: 0644
+  grafana:
+    image: "grafana/grafana:11.0.0"
+    environment:
+      GF_SECURITY_ADMIN_USER: "admin"
+      GF_SECURITY_ADMIN_PASSWORD: "admin"
+    ports:
+      - "3000:3000"
+    volumes:
+      - type: "volume"
+        target: "/var/lib/grafana"
+        source: "grafana-data"
+        read_only: false
+    depends_on:
+      prometheus:
+        condition: "service_started"
+    networks:
+      - "aspire"
+    configs:
+      - source: "grafana__etc_grafana_provisioning_datasources_datasources.yaml"
+        target: "/etc/grafana/provisioning/datasources/datasources.yaml"
+        mode: 0644
+  elasticsearch:
+    image: "docker.io/library/elasticsearch:8.17.3"
+    environment:
+      discovery.type: "single-node"
+      xpack.security.enabled: "false"
+      ELASTIC_PASSWORD: "${ELASTICSEARCH_PASSWORD}"
+    expose:
+      - "9200"
+      - "9300"
+    volumes:
+      - type: "volume"
+        target: "/usr/share/elasticsearch/data"
+        source: "ut.microserviceeco.host.apphost-8f52705bc0-elasticsearch-data"
+        read_only: false
+    networks:
+      - "aspire"
+  kibana:
+    image: "docker.elastic.co/kibana/kibana:8.17.3"
+    environment:
+      ConnectionStrings__elasticsearch: "http://elastic:${ELASTICSEARCH_PASSWORD}@elasticsearch:9200"
+      ELASTICSEARCH_HOSTS: "[\"http://elasticsearch:9200\"]"
+    ports:
+      - "5601:5601"
+    volumes:
+      - type: "volume"
+        target: "/usr/share/kibana/data"
+        source: "kibana-data"
+        read_only: false
+    depends_on:
+      elasticsearch:
+        condition: "service_started"
+    networks:
+      - "aspire"
+    configs:
+      - source: "kibana__usr_share_kibana_config_kibana.yml"
+        target: "/usr/share/kibana/config/kibana.yml"
+        mode: 0644
+  rabbitmq:
+    image: "docker.io/library/rabbitmq:4.2"
+    environment:
+      RABBITMQ_DEFAULT_USER: "guest"
+      RABBITMQ_DEFAULT_PASS: "${RABBITMQ_PASSWORD}"
+    expose:
+      - "5672"
+    volumes:
+      - type: "volume"
+        target: "/var/lib/rabbitmq"
+        source: "ut.microserviceeco.host.apphost-8f52705bc0-rabbitmq-data"
+        read_only: false
+    networks:
+      - "aspire"
+  postgres:
+    image: "docker.io/library/postgres:17.6"
+    environment:
+      POSTGRES_HOST_AUTH_METHOD: "scram-sha-256"
+      POSTGRES_INITDB_ARGS: "--auth-host=scram-sha-256 --auth-local=scram-sha-256"
+      POSTGRES_USER: "postgres"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD}"
+    expose:
+      - "5432"
+    volumes:
+      - type: "volume"
+        target: "/var/lib/postgresql/data"
+        source: "ut.microserviceeco.host.apphost-8f52705bc0-postgres-data"
+        read_only: false
+    networks:
+      - "aspire"
+  authservice:
+    image: "${AUTHSERVICE_IMAGE}"
+    environment:
+      OTEL_DOTNET_EXPERIMENTAL_OTLP_RETRY: "in_memory"
+      ASPNETCORE_FORWARDEDHEADERS_ENABLED: "true"
+      HTTP_PORTS: "${AUTHSERVICE_PORT}"
+      ConnectionStrings__authdb: "Host=postgres;Port=5432;Username=postgres;Password=${POSTGRES_PASSWORD};Database=authdb"
+      AUTHDB_HOST: "postgres"
+      AUTHDB_PORT: "5432"
+      AUTHDB_USERNAME: "postgres"
+      AUTHDB_PASSWORD: "${POSTGRES_PASSWORD}"
+      AUTHDB_URI: "postgresql://postgres:${POSTGRES_PASSWORD}@postgres:5432/authdb"
+      AUTHDB_JDBCCONNECTIONSTRING: "jdbc:postgresql://postgres:5432/authdb"
+      AUTHDB_DATABASENAME: "authdb"
+      ConnectionStrings__elasticsearch: "http://elastic:${ELASTICSEARCH_PASSWORD}@elasticsearch:9200"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://compose-dashboard:18889"
+      OTEL_EXPORTER_OTLP_PROTOCOL: "grpc"
+      OTEL_SERVICE_NAME: "authservice"
+    expose:
+      - "${AUTHSERVICE_PORT}"
+    depends_on:
+      elasticsearch:
+        condition: "service_started"
+      otel-collector:
+        condition: "service_started"
+    networks:
+      - "aspire"
+  productservice:
+    image: "${PRODUCTSERVICE_IMAGE}"
+    environment:
+      OTEL_DOTNET_EXPERIMENTAL_OTLP_RETRY: "in_memory"
+      ASPNETCORE_FORWARDEDHEADERS_ENABLED: "true"
+      HTTP_PORTS: "${PRODUCTSERVICE_PORT}"
+      ConnectionStrings__productdb: "Host=postgres;Port=5432;Username=postgres;Password=${POSTGRES_PASSWORD};Database=productdb"
+      PRODUCTDB_HOST: "postgres"
+      PRODUCTDB_PORT: "5432"
+      PRODUCTDB_USERNAME: "postgres"
+      PRODUCTDB_PASSWORD: "${POSTGRES_PASSWORD}"
+      PRODUCTDB_URI: "postgresql://postgres:${POSTGRES_PASSWORD}@postgres:5432/productdb"
+      PRODUCTDB_JDBCCONNECTIONSTRING: "jdbc:postgresql://postgres:5432/productdb"
+      PRODUCTDB_DATABASENAME: "productdb"
+      ConnectionStrings__elasticsearch: "http://elastic:${ELASTICSEARCH_PASSWORD}@elasticsearch:9200"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://compose-dashboard:18889"
+      OTEL_EXPORTER_OTLP_PROTOCOL: "grpc"
+      OTEL_SERVICE_NAME: "productservice"
+    expose:
+      - "${PRODUCTSERVICE_PORT}"
+    depends_on:
+      elasticsearch:
+        condition: "service_started"
+      otel-collector:
+        condition: "service_started"
+    networks:
+      - "aspire"
+  basketservice:
+    image: "${BASKETSERVICE_IMAGE}"
+    environment:
+      OTEL_DOTNET_EXPERIMENTAL_OTLP_RETRY: "in_memory"
+      ASPNETCORE_FORWARDEDHEADERS_ENABLED: "true"
+      HTTP_PORTS: "${BASKETSERVICE_PORT}"
+      ConnectionStrings__basketdb: "Host=postgres;Port=5432;Username=postgres;Password=${POSTGRES_PASSWORD};Database=basketdb"
+      BASKETDB_HOST: "postgres"
+      BASKETDB_PORT: "5432"
+      BASKETDB_USERNAME: "postgres"
+      BASKETDB_PASSWORD: "${POSTGRES_PASSWORD}"
+      BASKETDB_URI: "postgresql://postgres:${POSTGRES_PASSWORD}@postgres:5432/basketdb"
+      BASKETDB_JDBCCONNECTIONSTRING: "jdbc:postgresql://postgres:5432/basketdb"
+      BASKETDB_DATABASENAME: "basketdb"
+      PRODUCTSERVICE_HTTP: "http://productservice:${PRODUCTSERVICE_PORT}"
+      services__productservice__http__0: "http://productservice:${PRODUCTSERVICE_PORT}"
+      PRODUCTSERVICE_HTTPS: "https://productservice:${PRODUCTSERVICE_PORT}"
+      ConnectionStrings__elasticsearch: "http://elastic:${ELASTICSEARCH_PASSWORD}@elasticsearch:9200"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://compose-dashboard:18889"
+      OTEL_EXPORTER_OTLP_PROTOCOL: "grpc"
+      OTEL_SERVICE_NAME: "basketservice"
+    expose:
+      - "${BASKETSERVICE_PORT}"
+    depends_on:
+      elasticsearch:
+        condition: "service_started"
+      otel-collector:
+        condition: "service_started"
+    networks:
+      - "aspire"
+  orderservice:
+    image: "${ORDERSERVICE_IMAGE}"
+    environment:
+      OTEL_DOTNET_EXPERIMENTAL_OTLP_RETRY: "in_memory"
+      ASPNETCORE_FORWARDEDHEADERS_ENABLED: "true"
+      HTTP_PORTS: "${ORDERSERVICE_PORT}"
+      ConnectionStrings__orderdb: "Host=postgres;Port=5432;Username=postgres;Password=${POSTGRES_PASSWORD};Database=orderdb"
+      ORDERDB_HOST: "postgres"
+      ORDERDB_PORT: "5432"
+      ORDERDB_USERNAME: "postgres"
+      ORDERDB_PASSWORD: "${POSTGRES_PASSWORD}"
+      ORDERDB_URI: "postgresql://postgres:${POSTGRES_PASSWORD}@postgres:5432/orderdb"
+      ORDERDB_JDBCCONNECTIONSTRING: "jdbc:postgresql://postgres:5432/orderdb"
+      ORDERDB_DATABASENAME: "orderdb"
+      PRODUCTSERVICE_HTTP: "http://productservice:${PRODUCTSERVICE_PORT}"
+      services__productservice__http__0: "http://productservice:${PRODUCTSERVICE_PORT}"
+      PRODUCTSERVICE_HTTPS: "https://productservice:${PRODUCTSERVICE_PORT}"
+      ConnectionStrings__rabbitmq: "amqp://guest:${RABBITMQ_PASSWORD}@rabbitmq:5672"
+      RABBITMQ_HOST: "rabbitmq"
+      RABBITMQ_PORT: "5672"
+      RABBITMQ_USERNAME: "guest"
+      RABBITMQ_PASSWORD: "${RABBITMQ_PASSWORD}"
+      RABBITMQ_URI: "amqp://guest:${RABBITMQ_PASSWORD}@rabbitmq:5672"
+      ConnectionStrings__elasticsearch: "http://elastic:${ELASTICSEARCH_PASSWORD}@elasticsearch:9200"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://compose-dashboard:18889"
+      OTEL_EXPORTER_OTLP_PROTOCOL: "grpc"
+      OTEL_SERVICE_NAME: "orderservice"
+    expose:
+      - "${ORDERSERVICE_PORT}"
+    depends_on:
+      elasticsearch:
+        condition: "service_started"
+      otel-collector:
+        condition: "service_started"
+    networks:
+      - "aspire"
+  deliveryservice:
+    image: "${DELIVERYSERVICE_IMAGE}"
+    environment:
+      OTEL_DOTNET_EXPERIMENTAL_OTLP_RETRY: "in_memory"
+      ASPNETCORE_FORWARDEDHEADERS_ENABLED: "true"
+      HTTP_PORTS: "${DELIVERYSERVICE_PORT}"
+      ConnectionStrings__deliverydb: "Host=postgres;Port=5432;Username=postgres;Password=${POSTGRES_PASSWORD};Database=deliverydb"
+      DELIVERYDB_HOST: "postgres"
+      DELIVERYDB_PORT: "5432"
+      DELIVERYDB_USERNAME: "postgres"
+      DELIVERYDB_PASSWORD: "${POSTGRES_PASSWORD}"
+      DELIVERYDB_URI: "postgresql://postgres:${POSTGRES_PASSWORD}@postgres:5432/deliverydb"
+      DELIVERYDB_JDBCCONNECTIONSTRING: "jdbc:postgresql://postgres:5432/deliverydb"
+      DELIVERYDB_DATABASENAME: "deliverydb"
+      ConnectionStrings__rabbitmq: "amqp://guest:${RABBITMQ_PASSWORD}@rabbitmq:5672"
+      RABBITMQ_HOST: "rabbitmq"
+      RABBITMQ_PORT: "5672"
+      RABBITMQ_USERNAME: "guest"
+      RABBITMQ_PASSWORD: "${RABBITMQ_PASSWORD}"
+      RABBITMQ_URI: "amqp://guest:${RABBITMQ_PASSWORD}@rabbitmq:5672"
+      ConnectionStrings__elasticsearch: "http://elastic:${ELASTICSEARCH_PASSWORD}@elasticsearch:9200"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://compose-dashboard:18889"
+      OTEL_EXPORTER_OTLP_PROTOCOL: "grpc"
+      OTEL_SERVICE_NAME: "deliveryservice"
+    expose:
+      - "${DELIVERYSERVICE_PORT}"
+    depends_on:
+      elasticsearch:
+        condition: "service_started"
+      otel-collector:
+        condition: "service_started"
+    networks:
+      - "aspire"
+  apigateway:
+    image: "${APIGATEWAY_IMAGE}"
+    environment:
+      OTEL_DOTNET_EXPERIMENTAL_OTLP_RETRY: "in_memory"
+      ASPNETCORE_FORWARDEDHEADERS_ENABLED: "true"
+      HTTP_PORTS: "${APIGATEWAY_PORT}"
+      AUTHSERVICE_HTTP: "http://authservice:${AUTHSERVICE_PORT}"
+      services__authservice__http__0: "http://authservice:${AUTHSERVICE_PORT}"
+      AUTHSERVICE_HTTPS: "https://authservice:${AUTHSERVICE_PORT}"
+      PRODUCTSERVICE_HTTP: "http://productservice:${PRODUCTSERVICE_PORT}"
+      services__productservice__http__0: "http://productservice:${PRODUCTSERVICE_PORT}"
+      PRODUCTSERVICE_HTTPS: "https://productservice:${PRODUCTSERVICE_PORT}"
+      BASKETSERVICE_HTTP: "http://basketservice:${BASKETSERVICE_PORT}"
+      services__basketservice__http__0: "http://basketservice:${BASKETSERVICE_PORT}"
+      BASKETSERVICE_HTTPS: "https://basketservice:${BASKETSERVICE_PORT}"
+      ORDERSERVICE_HTTP: "http://orderservice:${ORDERSERVICE_PORT}"
+      services__orderservice__http__0: "http://orderservice:${ORDERSERVICE_PORT}"
+      ORDERSERVICE_HTTPS: "https://orderservice:${ORDERSERVICE_PORT}"
+      DELIVERYSERVICE_HTTP: "http://deliveryservice:${DELIVERYSERVICE_PORT}"
+      services__deliveryservice__http__0: "http://deliveryservice:${DELIVERYSERVICE_PORT}"
+      DELIVERYSERVICE_HTTPS: "https://deliveryservice:${DELIVERYSERVICE_PORT}"
+      ConnectionStrings__elasticsearch: "http://elastic:${ELASTICSEARCH_PASSWORD}@elasticsearch:9200"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://compose-dashboard:18889"
+      OTEL_EXPORTER_OTLP_PROTOCOL: "grpc"
+      OTEL_SERVICE_NAME: "apigateway"
+    expose:
+      - "${APIGATEWAY_PORT}"
+    depends_on:
+      elasticsearch:
+        condition: "service_started"
+      otel-collector:
+        condition: "service_started"
+    networks:
+      - "aspire"
+  ecommerce-web:
+    image: "${ECOMMERCE_WEB_IMAGE}"
+    environment:
+      NODE_ENV: "production"
+      PORT: "4200"
+      APIGATEWAY_HTTP: "http://apigateway:${APIGATEWAY_PORT}"
+      services__apigateway__http__0: "http://apigateway:${APIGATEWAY_PORT}"
+      APIGATEWAY_HTTPS: "https://apigateway:${APIGATEWAY_PORT}"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://compose-dashboard:18889"
+      OTEL_EXPORTER_OTLP_PROTOCOL: "grpc"
+      OTEL_SERVICE_NAME: "ecommerce-web"
+    ports:
+      - "4200:4200"
+    depends_on:
+      apigateway:
+        condition: "service_started"
+    networks:
+      - "aspire"
+networks:
+  aspire:
+    driver: "bridge"
+volumes:
+  prometheus-tsdb:
+    driver: "local"
+  grafana-data:
+    driver: "local"
+  ut.microserviceeco.host.apphost-8f52705bc0-elasticsearch-data:
+    driver: "local"
+  kibana-data:
+    driver: "local"
+  ut.microserviceeco.host.apphost-8f52705bc0-rabbitmq-data:
+    driver: "local"
+  ut.microserviceeco.host.apphost-8f52705bc0-postgres-data:
+    driver: "local"
+configs:
+  otel-collector__etc_otelcol_config.yaml:
+    file: "otel-collector/otel-collector-config.yaml"
+  prometheus__etc_prometheus_prometheus.yml:
+    file: "prometheus/prometheus.yml"
+  grafana__etc_grafana_provisioning_datasources_datasources.yaml:
+    file: "grafana/datasources.yaml"
+  kibana__usr_share_kibana_config_kibana.yml:
+    file: "kibana/kibana.yml"

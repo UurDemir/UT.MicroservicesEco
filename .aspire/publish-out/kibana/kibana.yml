@@ -4,7 +4,6 @@
 
 server.host: "0.0.0.0"
 server.shutdownTimeout: "5s"
-server.publicBaseUrl: "https://kibana.ugurdemir.dev"
 
 # Required: Kibana must know where Elasticsearch listens on the internal Docker network.
 elasticsearch.hosts: ["http://elasticsearch:9200"]
