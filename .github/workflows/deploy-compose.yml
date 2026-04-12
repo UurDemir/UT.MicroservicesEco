@@ -45,7 +45,7 @@ jobs:
         working-directory: UT.MicroserviceEco.Host/UT.MicroserviceEco.Host.AppHost
         run: aspire publish -o "$GITHUB_WORKSPACE/compose-bundle" --yes
 
-      - name: Write .env on runner
+      - name: Merge .env (Aspire publish + DEPLOY_DOTENV)
         env:
           DEPLOY_DOTENV: ${{ secrets.DEPLOY_DOTENV }}
         run: |
@@ -53,7 +53,37 @@ jobs:
             echo "Missing repository secret DEPLOY_DOTENV. Use deploy/env.example as a template (multiline secret)."
             exit 1
           fi
-          printf '%s\n' "$DEPLOY_DOTENV" > "$GITHUB_WORKSPACE/compose-bundle/.env"
+          python3 << 'PY'
+          import os
+          import re
+          from pathlib import Path
+
+          def parse_env(text: str) -> dict[str, str]:
+              env: dict[str, str] = {}
+              for line in text.splitlines():
+                  line = line.rstrip("\r\n")
+                  stripped = line.lstrip()
+                  if not stripped or stripped.startswith("#"):
+                      continue
+                  if "=" not in line:
+                      continue
+                  key, _, value = line.partition("=")
+                  key = key.strip()
+                  if not re.match(r"^[A-Za-z_][A-Za-z0-9_]*$", key):
+                      continue
+                  env[key] = value
+              return env
+
+          bundle = Path(os.environ["GITHUB_WORKSPACE"]) / "compose-bundle"
+          base_path = bundle / ".env"
+          if not base_path.is_file():
+              raise SystemExit(f"Missing {base_path} after aspire publish")
+          base = parse_env(base_path.read_text(encoding="utf-8"))
+          user = parse_env(os.environ["DEPLOY_DOTENV"])
+          merged = {**base, **user}
+          lines = [f"{k}={merged[k]}" for k in sorted(merged.keys())]
+          base_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+          PY
 
       - name: Prepare SSH (password only)
         env:

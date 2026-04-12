@@ -1,6 +1,5 @@
-using MassTransit;
-
 using UT.MicroserviceEco.IntegrationContracts;
+using UT.MicroserviceEco.OrderService.Messaging;
 using UT.MicroserviceEco.OrderService.Domain;
 
 using Microsoft.EntityFrameworkCore;
@@ -45,7 +44,7 @@ internal static class OrderEndpoints
     private static async Task<IResult> CreateAsync(
         CreateOrderRequest request,
         OrderDbContext dbContext,
-        IPublishEndpoint publishEndpoint,
+        IOrderCreatedEventPublisher orderEvents,
         IProductStockClient stockClient,
         ILogger<Program> logger,
         OrderMetrics metrics,
@@ -112,9 +111,9 @@ internal static class OrderEndpoints
 
         var lineItems = request.Lines
             .Select(l => new OrderLineItem(l.ProductId, l.Quantity, l.UnitPrice))
-            .ToList();
+            .ToArray();
 
-        await publishEndpoint.Publish(new OrderCreatedIntegrationEvent(
+        await orderEvents.PublishAsync(new OrderCreatedIntegrationEvent(
             order.Id,
             order.UserName,
             order.TotalAmount,

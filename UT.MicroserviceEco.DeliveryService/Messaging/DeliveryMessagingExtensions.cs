@@ -1,6 +1,4 @@
-using MassTransit;
-
-using UT.MicroserviceEco.DeliveryService.Consumers;
+using RabbitMQ.Client;
 
 namespace UT.MicroserviceEco.DeliveryService.Messaging;
 
@@ -11,16 +9,13 @@ internal static class DeliveryMessagingExtensions
         var rabbitConnection = configuration.GetConnectionString("rabbitmq")
             ?? throw new InvalidOperationException("Connection string 'rabbitmq' is required (Aspire RabbitMQ reference).");
 
-        services.AddMassTransit(x =>
+        services.AddSingleton<IConnection>(_ =>
         {
-            x.AddConsumer<OrderCreatedConsumer>();
-            x.SetKebabCaseEndpointNameFormatter();
-            x.UsingRabbitMq((context, cfg) =>
-            {
-                cfg.Host(new Uri(rabbitConnection));
-                cfg.ConfigureEndpoints(context);
-            });
+            var factory = new ConnectionFactory { Uri = new Uri(rabbitConnection) };
+            return factory.CreateConnection();
         });
+
+        services.AddHostedService<OrderCreatedQueueConsumer>();
 
         return services;
     }
