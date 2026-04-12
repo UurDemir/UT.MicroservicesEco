@@ -55,37 +55,49 @@ jobs:
           fi
           printf '%s\n' "$DEPLOY_DOTENV" > "$GITHUB_WORKSPACE/compose-bundle/.env"
 
-      - name: Configure SSH
+      - name: Check SSH authentication
         env:
           SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
-          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_PASSWORD: ${{ secrets.SSH_PASSWORD }}
         run: |
+          if [ -z "${SSH_PRIVATE_KEY}" ] && [ -z "${SSH_PASSWORD}" ]; then
+            echo "Set repository secret SSH_PRIVATE_KEY (recommended) or SSH_PASSWORD."
+            exit 1
+          fi
+
+      - name: Sync bundle to server (SSH)
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          SSH_PASSWORD: ${{ secrets.SSH_PASSWORD }}
+          SSH_PORT: ${{ inputs.ssh_port }}
+          REMOTE_PATH: ${{ inputs.remote_path }}
+        run: |
+          set -euo pipefail
           mkdir -p ~/.ssh
-          echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_deploy
-          chmod 600 ~/.ssh/id_deploy
-          ssh-keyscan -p "${{ inputs.ssh_port }}" -H "$SSH_HOST" >> ~/.ssh/known_hosts
+          chmod 700 ~/.ssh
+          ssh-keyscan -p "$SSH_PORT" -H "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null
 
-      - name: Ensure remote directory exists
-        env:
-          SSH_HOST: ${{ secrets.SSH_HOST }}
-          SSH_USER: ${{ secrets.SSH_USER }}
-          REMOTE_PATH: ${{ inputs.remote_path }}
-        run: |
-          ssh -i "$HOME/.ssh/id_deploy" -p "${{ inputs.ssh_port }}" -o IdentitiesOnly=yes \
-            "${SSH_USER}@${SSH_HOST}" "mkdir -p -- '${REMOTE_PATH}'"
+          if [ -n "${SSH_PRIVATE_KEY}" ]; then
+            echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_deploy
+            chmod 600 ~/.ssh/id_deploy
+            run_ssh() { ssh -i "$HOME/.ssh/id_deploy" -p "$SSH_PORT" -o IdentitiesOnly=yes "$@"; }
+            RSYNC_RSH="ssh -i $HOME/.ssh/id_deploy -p $SSH_PORT -o IdentitiesOnly=yes"
+          else
+            sudo apt-get update -qq && sudo apt-get install -y -qq sshpass
+            export SSHPASS="$SSH_PASSWORD"
+            run_ssh() { sshpass -e ssh -p "$SSH_PORT" -o StrictHostKeyChecking=yes "$@"; }
+            RSYNC_RSH="sshpass -e ssh -p $SSH_PORT -o StrictHostKeyChecking=yes"
+          fi
 
-      - name: Sync bundle to server
-        env:
-          SSH_HOST: ${{ secrets.SSH_HOST }}
-          SSH_USER: ${{ secrets.SSH_USER }}
-          REMOTE_PATH: ${{ inputs.remote_path }}
-        run: |
-          rsync -avz --delete \
-            -e "ssh -i $HOME/.ssh/id_deploy -p ${{ inputs.ssh_port }} -o IdentitiesOnly=yes" \
+          run_ssh "${SSH_USER}@${SSH_HOST}" "mkdir -p -- '${REMOTE_PATH}'"
+          rsync -avz --delete -e "$RSYNC_RSH" \
             "$GITHUB_WORKSPACE/compose-bundle/" \
             "${SSH_USER}@${SSH_HOST}:${REMOTE_PATH}/"
 
-      - name: Pull images and restart stack
+      - name: Pull images and restart stack (SSH key)
+        if: ${{ secrets.SSH_PRIVATE_KEY != '' }}
         uses: appleboy/ssh-action@v1.2.0
         env:
           GHCR_USER: ${{ secrets.GHCR_PULL_USER }}
@@ -94,6 +106,30 @@ jobs:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ inputs.ssh_port }}
+          envs: GHCR_USER,GHCR_TOKEN
+          script_stop: true
+          script: |
+            set -euo pipefail
+            cd "${{ inputs.remote_path }}"
+            if [ -n "${GHCR_TOKEN:-}" ] && [ -n "${GHCR_USER:-}" ]; then
+              echo "${GHCR_TOKEN}" | docker login ghcr.io -u "${GHCR_USER}" --password-stdin
+            else
+              echo "GHCR_PULL_TOKEN / GHCR_PULL_USER not set; skipping docker login (only OK for public GHCR images)."
+            fi
+            docker compose pull
+            docker compose up -d --remove-orphans
+
+      - name: Pull images and restart stack (SSH password)
+        if: ${{ secrets.SSH_PRIVATE_KEY == '' }}
+        uses: appleboy/ssh-action@v1.2.0
+        env:
+          GHCR_USER: ${{ secrets.GHCR_PULL_USER }}
+          GHCR_TOKEN: ${{ secrets.GHCR_PULL_TOKEN }}
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          password: ${{ secrets.SSH_PASSWORD }}
           port: ${{ inputs.ssh_port }}
           envs: GHCR_USER,GHCR_TOKEN
           script_stop: true
