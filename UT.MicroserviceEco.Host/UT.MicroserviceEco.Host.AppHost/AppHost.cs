@@ -8,7 +8,7 @@ Func<string, string> obsPath = relative => Path.GetFullPath(relative, builder.Ap
 Directory.CreateDirectory(obsPath("Observability/reverse-proxy/ssl"));
 
 builder.AddDockerComposeEnvironment("compose")
-    .WithDashboard();
+    .WithDashboard(dashboard => dashboard.WithForwardedHeaders(true));
 //var k8s = builder.AddKubernetesEnvironment("k8s");
 
 var jaeger = builder.AddContainer("jaeger", "jaegertracing/all-in-one", "1.52")
@@ -259,6 +259,7 @@ builder.AddContainer("reverse-proxy", "nginx", "1.27-alpine")
     .WaitFor(ecommerceWeb)
     .WithHttpEndpoint(targetPort: 80, port: 80)
     .WithHttpsEndpoint(targetPort: 443, port: 443)
-    .WithExternalHttpEndpoints();
+    .WithExternalHttpEndpoints()
+    .PublishAsDockerComposeService((_, s) => DockerComposePublishingExtensions.EnsureComposeDependsOn(s, "compose-dashboard"));
 
 builder.Build().Run();
