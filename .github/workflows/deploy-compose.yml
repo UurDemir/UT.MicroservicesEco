@@ -55,91 +55,68 @@ jobs:
           fi
           printf '%s\n' "$DEPLOY_DOTENV" > "$GITHUB_WORKSPACE/compose-bundle/.env"
 
-      - name: Check SSH authentication
+      - name: Prepare SSH (password only)
         env:
-          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          SSH_HOST: ${{ secrets.SSH_HOST }}
           SSH_PASSWORD: ${{ secrets.SSH_PASSWORD }}
+          SSH_PORT: ${{ inputs.ssh_port }}
         run: |
-          if [ -z "${SSH_PRIVATE_KEY}" ] && [ -z "${SSH_PASSWORD}" ]; then
-            echo "Set repository secret SSH_PRIVATE_KEY (recommended) or SSH_PASSWORD."
+          set -euo pipefail
+          trim() { local s="$1"; s="${s#"${s%%[![:space:]]*}"}"; s="${s%"${s##*[![:space:]]}"}"; printf '%s' "$s"; }
+          PASS="$(printf '%s' "${SSH_PASSWORD:-}" | tr -d '\r')"
+          PASS="$(trim "$PASS")"
+          if [ -z "$PASS" ]; then
+            echo "Set repository secret SSH_PASSWORD."
             exit 1
           fi
+          sudo apt-get update -qq && sudo apt-get install -y -qq sshpass
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          ssh-keyscan -p "$SSH_PORT" -H "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          printf '%s' "$PASS" > "$RUNNER_TEMP/.compose_deploy_sshpass"
+          chmod 600 "$RUNNER_TEMP/.compose_deploy_sshpass"
 
-      - name: Sync bundle to server (SSH)
+      - name: Sync bundle to server
         env:
           SSH_HOST: ${{ secrets.SSH_HOST }}
           SSH_USER: ${{ secrets.SSH_USER }}
-          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
-          SSH_PASSWORD: ${{ secrets.SSH_PASSWORD }}
           SSH_PORT: ${{ inputs.ssh_port }}
           REMOTE_PATH: ${{ inputs.remote_path }}
         run: |
           set -euo pipefail
-          mkdir -p ~/.ssh
-          chmod 700 ~/.ssh
-          ssh-keyscan -p "$SSH_PORT" -H "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null
-
-          if [ -n "${SSH_PRIVATE_KEY}" ]; then
-            echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_deploy
-            chmod 600 ~/.ssh/id_deploy
-            run_ssh() { ssh -i "$HOME/.ssh/id_deploy" -p "$SSH_PORT" -o IdentitiesOnly=yes "$@"; }
-            RSYNC_RSH="ssh -i $HOME/.ssh/id_deploy -p $SSH_PORT -o IdentitiesOnly=yes"
-          else
-            sudo apt-get update -qq && sudo apt-get install -y -qq sshpass
-            export SSHPASS="$SSH_PASSWORD"
-            run_ssh() { sshpass -e ssh -p "$SSH_PORT" -o StrictHostKeyChecking=yes "$@"; }
-            RSYNC_RSH="sshpass -e ssh -p $SSH_PORT -o StrictHostKeyChecking=yes"
-          fi
-
+          PASSFILE="$RUNNER_TEMP/.compose_deploy_sshpass"
+          PW_SSH_OPTS="-p $SSH_PORT -o StrictHostKeyChecking=yes -o PreferredAuthentications=password,keyboard-interactive -o PubkeyAuthentication=no"
+          run_ssh() { sshpass -f "$PASSFILE" ssh $PW_SSH_OPTS "$@"; }
+          RSYNC_RSH="sshpass -f $PASSFILE ssh $PW_SSH_OPTS"
           run_ssh "${SSH_USER}@${SSH_HOST}" "mkdir -p -- '${REMOTE_PATH}'"
           rsync -avz --delete -e "$RSYNC_RSH" \
             "$GITHUB_WORKSPACE/compose-bundle/" \
             "${SSH_USER}@${SSH_HOST}:${REMOTE_PATH}/"
 
-      - name: Pull images and restart stack (SSH key)
-        if: ${{ secrets.SSH_PRIVATE_KEY != '' }}
-        uses: appleboy/ssh-action@v1.2.0
+      - name: Pull images and restart stack on server
         env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SSH_PORT: ${{ inputs.ssh_port }}
+          REMOTE_PATH: ${{ inputs.remote_path }}
           GHCR_USER: ${{ secrets.GHCR_PULL_USER }}
           GHCR_TOKEN: ${{ secrets.GHCR_PULL_TOKEN }}
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          port: ${{ inputs.ssh_port }}
-          envs: GHCR_USER,GHCR_TOKEN
-          script_stop: true
-          script: |
-            set -euo pipefail
-            cd "${{ inputs.remote_path }}"
-            if [ -n "${GHCR_TOKEN:-}" ] && [ -n "${GHCR_USER:-}" ]; then
-              echo "${GHCR_TOKEN}" | docker login ghcr.io -u "${GHCR_USER}" --password-stdin
-            else
-              echo "GHCR_PULL_TOKEN / GHCR_PULL_USER not set; skipping docker login (only OK for public GHCR images)."
-            fi
-            docker compose pull
-            docker compose up -d --remove-orphans
-
-      - name: Pull images and restart stack (SSH password)
-        if: ${{ secrets.SSH_PRIVATE_KEY == '' }}
-        uses: appleboy/ssh-action@v1.2.0
-        env:
-          GHCR_USER: ${{ secrets.GHCR_PULL_USER }}
-          GHCR_TOKEN: ${{ secrets.GHCR_PULL_TOKEN }}
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          password: ${{ secrets.SSH_PASSWORD }}
-          port: ${{ inputs.ssh_port }}
-          envs: GHCR_USER,GHCR_TOKEN
-          script_stop: true
-          script: |
-            set -euo pipefail
-            cd "${{ inputs.remote_path }}"
-            if [ -n "${GHCR_TOKEN:-}" ] && [ -n "${GHCR_USER:-}" ]; then
-              echo "${GHCR_TOKEN}" | docker login ghcr.io -u "${GHCR_USER}" --password-stdin
-            else
-              echo "GHCR_PULL_TOKEN / GHCR_PULL_USER not set; skipping docker login (only OK for public GHCR images)."
-            fi
-            docker compose pull
-            docker compose up -d --remove-orphans
+        run: |
+          set -euo pipefail
+          PASSFILE="$RUNNER_TEMP/.compose_deploy_sshpass"
+          PW_SSH_OPTS="-p $SSH_PORT -o StrictHostKeyChecking=yes -o PreferredAuthentications=password,keyboard-interactive -o PubkeyAuthentication=no"
+          run_ssh() { sshpass -f "$PASSFILE" ssh $PW_SSH_OPTS "$@"; }
+          {
+            printf 'set -euo pipefail\ncd %q\n' "$REMOTE_PATH"
+            printf '%s\n' \
+              'if [ -n "${GHCR_TOKEN:-}" ] && [ -n "${GHCR_USER:-}" ]; then' \
+              '  echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin' \
+              'else' \
+              '  echo "GHCR_PULL_* not set; skipping docker login (OK if images are public)."' \
+              'fi' \
+              'docker compose pull' \
+              'docker compose up -d --remove-orphans'
+          } > /tmp/remote_compose.sh
+          run_ssh "${SSH_USER}@${SSH_HOST}" \
+            env "GHCR_USER=$(printf '%q' "${GHCR_USER:-}")" "GHCR_TOKEN=$(printf '%q' "${GHCR_TOKEN:-}")" bash -s \
+            < /tmp/remote_compose.sh
