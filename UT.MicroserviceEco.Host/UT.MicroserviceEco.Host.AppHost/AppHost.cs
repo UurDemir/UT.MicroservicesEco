@@ -203,6 +203,9 @@ var ecommerceWeb = builder.AddJavaScriptApp("ecommerce-web", ecommerceWebPath, r
     .PublishAsDockerComposeService((_, service) =>
     {
         service.Ports.Clear();
+        service.Environment["PORT"] = "80";
+        service.Expose.Clear();
+        service.Expose.Add("80");
         service.Environment["APIGATEWAY_HTTP"] = "http://apigateway:8080";
         service.Environment["services__apigateway__http__0"] = "http://apigateway:8080";
         service.Environment["APIGATEWAY_HTTPS"] = "https://apigateway:8080";

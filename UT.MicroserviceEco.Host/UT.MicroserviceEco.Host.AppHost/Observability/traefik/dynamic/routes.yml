@@ -63,4 +63,5 @@ http:
     svc-ecommerce:
       loadBalancer:
         servers:
-          - url: http://ecommerce-web:4200
+          # Production image (ecommerce-web/Dockerfile) is nginx on :80, not dev :4200
+          - url: http://ecommerce-web:80
