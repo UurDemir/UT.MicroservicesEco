@@ -20,7 +20,7 @@ var connectionString = builder.Configuration.GetConnectionString("basketdb")
 builder.Services.AddDbContext<BasketDbContext>(options => options.UseNpgsql(connectionString));
 
 builder.Services.AddTrustedGatewayIdentity();
-builder.Services.AddProductServiceClient(new Uri("https://productservice"));
+builder.Services.AddProductServiceClient(new Uri("http://productservice"));
 builder.Services.AddECommerceMeter();
 builder.Services.AddSingleton<BasketMetrics>();
 

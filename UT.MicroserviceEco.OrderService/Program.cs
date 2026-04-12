@@ -22,7 +22,7 @@ builder.Services.AddDbContext<OrderDbContext>(options => options.UseNpgsql(conne
 
 builder.Services.AddTrustedGatewayIdentity();
 builder.Services.AddHttpContextAccessor();
-builder.Services.AddProductServiceClient(new Uri("https://productservice"));
+builder.Services.AddProductServiceClient(new Uri("http://productservice"));
 builder.Services.AddScoped<IProductStockClient, ProductStockClient>();
 builder.Services.AddOrderMessaging(builder.Configuration);
 builder.Services.AddECommerceMeter();
