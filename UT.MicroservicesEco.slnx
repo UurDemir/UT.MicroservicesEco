@@ -1,10 +1,18 @@
 <Solution>
   <Folder Name="/Host/">
     <Project Path="UT.MicroserviceEco.Host/UT.MicroserviceEco.Host.AppHost/UT.MicroserviceEco.Host.AppHost.csproj" Id="1ebd5e23-3462-498a-8dfb-2d6e7a7ff7ea" />
-    <Project Path="UT.MicroserviceEco.Host/UT.MicroserviceEco.Host.ServiceDefaults/UT.MicroserviceEco.Host.ServiceDefaults.csproj" />
   </Folder>
   <Folder Name="/Services/">
+    <Project Path="UT.MicroserviceEco.ApiGateway/UT.MicroserviceEco.ApiGateway.csproj" />
     <Project Path="UT.MicroserviceEco.AuthService/UT.MicroserviceEco.AuthService.csproj" />
+    <Project Path="UT.MicroserviceEco.BasketService/UT.MicroserviceEco.BasketService.csproj" />
+    <Project Path="UT.MicroserviceEco.DeliveryService/UT.MicroserviceEco.DeliveryService.csproj" />
+    <Project Path="UT.MicroserviceEco.OrderService/UT.MicroserviceEco.OrderService.csproj" />
+    <Project Path="UT.MicroserviceEco.ProductService/UT.MicroserviceEco.ProductService.csproj" />
   </Folder>
-  <Folder Name="/Shared/" />
+  <Folder Name="/Shared/">
+    <Project Path="UT.MicroserviceEco.Host/UT.MicroserviceEco.Host.ServiceDefaults/UT.MicroserviceEco.Host.ServiceDefaults.csproj" />
+    <Project Path="UT.MicroserviceEco.IntegrationContracts/UT.MicroserviceEco.IntegrationContracts.csproj" />
+    <Project Path="UT.MicroserviceEco.ProductService.Sdk/UT.MicroserviceEco.ProductService.Sdk.csproj" />
+  </Folder>
 </Solution>

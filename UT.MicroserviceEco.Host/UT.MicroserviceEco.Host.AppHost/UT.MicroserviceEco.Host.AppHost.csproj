@@ -9,13 +9,21 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Aspire.Hosting.Docker" Version="13.2.2" />
     <PackageReference Include="Aspire.Hosting.Elasticsearch" Version="13.2.0" />
+    <PackageReference Include="Aspire.Hosting.JavaScript" Version="13.2.2" />
+    <PackageReference Include="Aspire.Hosting.Kubernetes" Version="13.2.2-preview.1.26207.2" />
     <PackageReference Include="Aspire.Hosting.PostgreSQL" Version="13.2.0" />
     <PackageReference Include="Aspire.Hosting.RabbitMQ" Version="13.2.0" />
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\UT.MicroserviceEco.ApiGateway\UT.MicroserviceEco.ApiGateway.csproj" />
     <ProjectReference Include="..\..\UT.MicroserviceEco.AuthService\UT.MicroserviceEco.AuthService.csproj" />
+    <ProjectReference Include="..\..\UT.MicroserviceEco.BasketService\UT.MicroserviceEco.BasketService.csproj" />
+    <ProjectReference Include="..\..\UT.MicroserviceEco.DeliveryService\UT.MicroserviceEco.DeliveryService.csproj" />
+    <ProjectReference Include="..\..\UT.MicroserviceEco.OrderService\UT.MicroserviceEco.OrderService.csproj" />
+    <ProjectReference Include="..\..\UT.MicroserviceEco.ProductService\UT.MicroserviceEco.ProductService.csproj" />
   </ItemGroup>
 
   <ItemGroup>

@@ -1,8 +1,7 @@
-﻿using Microsoft.AspNetCore.Identity.Data;
-
-using UT.MicroserviceEco.AuthService.Application;
+﻿using UT.MicroserviceEco.AuthService.Application;
 using UT.MicroserviceEco.AuthService.Infrastructure;
 using UT.MicroserviceEco.AuthService.Telemetry;
+
 using Microsoft.EntityFrameworkCore;
 
 namespace UT.MicroserviceEco.AuthService.Endpoints;

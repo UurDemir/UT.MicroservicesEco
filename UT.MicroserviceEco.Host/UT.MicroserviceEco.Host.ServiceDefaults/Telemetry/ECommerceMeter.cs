@@ -1,4 +1,4 @@
-namespace MicroserviceExample.ServiceDefaults.Telemetry;
+namespace UT.MicroserviceEco.Host.ServiceDefaults.Telemetry;
 
 /// <summary>Shared OpenTelemetry meter name so custom instruments export with ASP.NET / HTTP metrics.</summary>
 public static class ECommerceMeter

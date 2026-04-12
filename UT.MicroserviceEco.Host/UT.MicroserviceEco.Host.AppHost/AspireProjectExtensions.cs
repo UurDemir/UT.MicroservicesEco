@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-
-namespace UT.MicroserviceEco.Host.AppHost;
+﻿namespace UT.MicroserviceEco.Host.AppHost;
 
 internal static class AspireProjectExtensions
 {

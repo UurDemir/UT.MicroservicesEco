@@ -1,10 +1,17 @@
+using Aspire.Hosting.ApplicationModel;
+using UT.MicroserviceEco.Host.AppHost;
+
 var builder = DistributedApplication.CreateBuilder(args);
+Func<string, string> obsPath = relative => Path.GetFullPath(relative, builder.AppHostDirectory);
+
+builder.AddDockerComposeEnvironment("compose");
+//var k8s = builder.AddKubernetesEnvironment("k8s");
 
 var jaeger = builder.AddContainer("jaeger", "jaegertracing/all-in-one", "1.52")
     .WithEnvironment("COLLECTOR_OTLP_ENABLED", "true")
     .WithHttpEndpoint(targetPort: 16686, port: 16686)
     .WithExternalHttpEndpoints()
-    .WithUrls(c=>
+    .WithUrls(c =>
     {
         foreach (var url in c.Urls)
         {
@@ -16,7 +23,13 @@ var jaeger = builder.AddContainer("jaeger", "jaegertracing/all-in-one", "1.52")
     });
 
 var otelCollector = builder.AddContainer("otel-collector", "otel/opentelemetry-collector-contrib", "0.102.1")
-    .WithBindMount("./Observability/otel-collector-config.yaml", "/etc/otelcol/config.yaml", isReadOnly: true)
+    .WithContainerFiles("/etc/otelcol", [
+        new ContainerFile
+        {
+            Name = "config.yaml",
+            SourcePath = obsPath("Observability/otel-collector-config.yaml"),
+        },
+    ])
     .WithArgs("--config=/etc/otelcol/config.yaml")
     .WaitFor(jaeger)
     .WithEndpoint(targetPort: 4317, port: 4317, scheme: "http", name: "otlp-grpc")
@@ -24,7 +37,13 @@ var otelCollector = builder.AddContainer("otel-collector", "otel/opentelemetry-c
 
 var prometheus = builder.AddContainer("prometheus", "prom/prometheus", "v2.52.0")
     .WithArgs("--config.file=/etc/prometheus/prometheus.yml", "--storage.tsdb.path=/prometheus")
-    .WithBindMount("./Observability/prometheus.yml", "/etc/prometheus/prometheus.yml", isReadOnly: true)
+    .WithContainerFiles("/etc/prometheus", [
+        new ContainerFile
+        {
+            Name = "prometheus.yml",
+            SourcePath = obsPath("Observability/prometheus.yml"),
+        },
+    ])
     .WithVolume("prometheus-tsdb", "/prometheus")
     .WaitFor(otelCollector)
     .WithHttpEndpoint(targetPort: 9090, port: 9090)
@@ -40,10 +59,14 @@ var prometheus = builder.AddContainer("prometheus", "prom/prometheus", "v2.52.0"
         }
     });
 
-var grafana = builder.AddContainer("grafana", "grafana/grafana", "11.0.0")
+builder.AddContainer("grafana", "grafana/grafana", "11.0.0")
     .WithEnvironment("GF_SECURITY_ADMIN_USER", "admin")
     .WithEnvironment("GF_SECURITY_ADMIN_PASSWORD", "admin")
-    .WithBindMount("./Observability/grafana/provisioning", "/etc/grafana/provisioning", isReadOnly: true)
+    .WithContainerFiles(
+        "/etc/grafana/provisioning",
+        ContainerDirectory.GetFileSystemItemsFromPath(
+            obsPath("Observability/grafana/provisioning"),
+            searchOptions: SearchOption.AllDirectories))
     .WithVolume("grafana-data", "/var/lib/grafana")
     .WaitFor(prometheus)
     .WithHttpEndpoint(targetPort: 3000, port: 3000)
@@ -58,8 +81,6 @@ var grafana = builder.AddContainer("grafana", "grafana/grafana", "11.0.0")
             }
         }
     });
-
-
 
 var elasticsearch = builder.AddElasticsearch("elasticsearch")
     .WithEnvironment("xpack.security.enabled", "false")
@@ -79,8 +100,15 @@ var elasticsearch = builder.AddElasticsearch("elasticsearch")
 builder.AddContainer("kibana", "docker.elastic.co/kibana/kibana", "8.17.3")
     .WaitFor(elasticsearch)
     .WithReference(elasticsearch)
+    // Explicit hosts: kibana.yml must match; env also sets JSON array for the Docker entrypoint.
     .WithEnvironment("ELASTICSEARCH_HOSTS", "[\"http://elasticsearch:9200\"]")
-    .WithBindMount("./Observability/kibana/kibana.yml", "/usr/share/kibana/config/kibana.yml", isReadOnly: true)
+    .WithContainerFiles("/usr/share/kibana/config", [
+        new ContainerFile
+        {
+            Name = "kibana.yml",
+            SourcePath = obsPath("Observability/kibana/kibana.yml"),
+        },
+    ])
     .WithVolume("kibana-data", "/usr/share/kibana/data")
     .WithHttpEndpoint(targetPort: 5601, port: 5601)
     .WithExternalHttpEndpoints()
@@ -99,11 +127,60 @@ var rabbitmq = builder.AddRabbitMQ("rabbitmq").WithDataVolume();
 
 var postgres = builder.AddPostgres("postgres").WithDataVolume();
 var authDb = postgres.AddDatabase("authdb");
+var productDb = postgres.AddDatabase("productdb");
+var basketDb = postgres.AddDatabase("basketdb");
+var orderDb = postgres.AddDatabase("orderdb");
+var deliveryDb = postgres.AddDatabase("deliverydb");
 
-builder.AddProject<Projects.UT_MicroserviceEco_AuthService>("ut-microserviceeco-authservice")
+var authService = builder.AddProject<Projects.UT_MicroserviceEco_AuthService>("authservice")
     .WithReference(authDb)
     .WithReference(elasticsearch)
     .WaitFor(elasticsearch)
-    .WithOtlpExporter();
+    .WithOtlpExporter(otelCollector);
+
+var productService = builder.AddProject<Projects.UT_MicroserviceEco_ProductService>("productservice")
+    .WithReference(productDb)
+    .WithReference(elasticsearch)
+    .WaitFor(elasticsearch)
+    .WithOtlpExporter(otelCollector);
+
+var basketService = builder.AddProject<Projects.UT_MicroserviceEco_BasketService>("basketservice")
+    .WithReference(basketDb)
+    .WithReference(productService)
+    .WithReference(elasticsearch)
+    .WaitFor(elasticsearch)
+    .WithOtlpExporter(otelCollector);
+
+var orderService = builder.AddProject<Projects.UT_MicroserviceEco_OrderService>("orderservice")
+    .WithReference(orderDb)
+    .WithReference(productService)
+    .WithReference(rabbitmq)
+    .WithReference(elasticsearch)
+    .WaitFor(elasticsearch)
+    .WithOtlpExporter(otelCollector);
+
+var deliveryService = builder.AddProject<Projects.UT_MicroserviceEco_DeliveryService>("deliveryservice")
+    .WithReference(deliveryDb)
+    .WithReference(rabbitmq)
+    .WithReference(elasticsearch)
+    .WaitFor(elasticsearch)
+    .WithOtlpExporter(otelCollector);
+
+var apiGateway = builder.AddProject<Projects.UT_MicroserviceEco_ApiGateway>("apigateway")
+    .WithReference(authService)
+    .WithReference(productService)
+    .WithReference(basketService)
+    .WithReference(orderService)
+    .WithReference(deliveryService)
+    .WithReference(elasticsearch)
+    .WaitFor(elasticsearch)
+    .WithOtlpExporter(otelCollector);
+
+var ecommerceWebPath = Path.GetFullPath(Path.Combine(builder.AppHostDirectory, "..", "..", "ecommerce-web"));
+builder.AddJavaScriptApp("ecommerce-web", ecommerceWebPath, runScriptName: "start")
+    .WithHttpEndpoint(port: 4200, env: "PORT")
+    .WithReference(apiGateway)
+    .WaitFor(apiGateway)
+    .WithExternalHttpEndpoints();
 
 builder.Build().Run();

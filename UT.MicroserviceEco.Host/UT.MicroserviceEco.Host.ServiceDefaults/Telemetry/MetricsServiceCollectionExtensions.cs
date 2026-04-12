@@ -1,7 +1,8 @@
 using System.Diagnostics.Metrics;
+
 using Microsoft.Extensions.DependencyInjection;
 
-namespace MicroserviceExample.ServiceDefaults.Telemetry;
+namespace UT.MicroserviceEco.Host.ServiceDefaults.Telemetry;
 
 public static class MetricsServiceCollectionExtensions
 {

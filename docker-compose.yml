@@ -1,0 +1,42 @@
+services:
+  ut.microserviceeco.apigateway:
+    image: ${DOCKER_REGISTRY-}utmicroserviceecoapigateway
+    build:
+      context: .
+      dockerfile: UT.MicroserviceEco.ApiGateway/Dockerfile
+
+  ut.microserviceeco.authservice:
+    image: ${DOCKER_REGISTRY-}utmicroserviceecoauthservice
+    build:
+      context: .
+      dockerfile: UT.MicroserviceEco.AuthService/Dockerfile
+
+  ut.microserviceeco.productservice:
+    image: ${DOCKER_REGISTRY-}utmicroserviceecoproductservice
+    build:
+      context: .
+      dockerfile: UT.MicroserviceEco.ProductService/Dockerfile
+
+  ut.microserviceeco.basketservice:
+    image: ${DOCKER_REGISTRY-}utmicroserviceecobasketservice
+    build:
+      context: .
+      dockerfile: UT.MicroserviceEco.BasketService/Dockerfile
+
+  ut.microserviceeco.orderservice:
+    image: ${DOCKER_REGISTRY-}utmicroserviceecoorderservice
+    build:
+      context: .
+      dockerfile: UT.MicroserviceEco.OrderService/Dockerfile
+
+  ut.microserviceeco.deliveryservice:
+    image: ${DOCKER_REGISTRY-}utmicroserviceecodeliveryservice
+    build:
+      context: .
+      dockerfile: UT.MicroserviceEco.DeliveryService/Dockerfile
+
+  ecommerce-web:
+    image: ${DOCKER_REGISTRY-}utmicroserviceecoecommerceweb
+    build:
+      context: ./ecommerce-web
+      dockerfile: Dockerfile

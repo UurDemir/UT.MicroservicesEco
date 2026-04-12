@@ -1,15 +1,13 @@
-using MicroserviceExample.ServiceDefaults.Telemetry;
-
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
-
-using System.Diagnostics.Metrics;
 
 using UT.MicroserviceEco.AuthService.Application;
 using UT.MicroserviceEco.AuthService.Endpoints;
 using UT.MicroserviceEco.AuthService.Infrastructure;
 using UT.MicroserviceEco.AuthService.Telemetry;
 using UT.MicroserviceEco.Host.ServiceDefaults;
+using UT.MicroserviceEco.Host.ServiceDefaults.GatewayIdentity;
+using UT.MicroserviceEco.Host.ServiceDefaults.Telemetry;
 
 var builder = WebApplication.CreateBuilder(args);
 

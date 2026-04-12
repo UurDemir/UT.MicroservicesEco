@@ -1,0 +1,13 @@
+@UT.MicroserviceEco.DeliveryService_HostAddress = http://localhost:5190
+
+#if (EnableOpenAPI)
+GET {{UT.MicroserviceEco.DeliveryService_HostAddress}}/openapi/v1.json
+Accept: application/json
+
+###
+#endif
+
+GET {{UT.MicroserviceEco.DeliveryService_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

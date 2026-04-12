@@ -1,8 +1,0 @@
-{
-  "/api": {
-    "target": "https://apigateway-microserviceexample.dev.localhost:7104/",
-    "secure": false,
-    "changeOrigin": true,
-    "logLevel": "warn"
-  }
-}

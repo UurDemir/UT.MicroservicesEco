@@ -6,10 +6,6 @@ using Serilog;
 using Serilog.Debugging;
 using Serilog.Sinks.Elasticsearch;
 
-using System;
-using System.Collections.Generic;
-using System.Text;
-
 namespace UT.MicroserviceEco.Host.ServiceDefaults;
 
 

@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UserSecretsId>064ca7ae-2e51-4799-b88d-29054731ac14</UserSecretsId>
+    <DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="MassTransit" Version="9.0.1" />
+    <PackageReference Include="MassTransit.RabbitMQ" Version="9.0.1" />
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.5" />
+    <PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.23.0" />
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\UT.MicroserviceEco.ProductService.Sdk\UT.MicroserviceEco.ProductService.Sdk.csproj" />
+    <ProjectReference Include="..\UT.MicroserviceEco.Host\UT.MicroserviceEco.Host.ServiceDefaults\UT.MicroserviceEco.Host.ServiceDefaults.csproj" />
+    <ProjectReference Include="..\UT.MicroserviceEco.IntegrationContracts\UT.MicroserviceEco.IntegrationContracts.csproj" />
+  </ItemGroup>
+
+</Project>

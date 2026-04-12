@@ -1,20 +1,18 @@
-using MicroserviceExample.ServiceDefaults.Telemetry;
-
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.ServiceDiscovery;
 
 using OpenTelemetry;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Trace;
 
-using UT.MicroserviceEco.Host.ServiceDefaults;
+using UT.MicroserviceEco.Host.ServiceDefaults.Telemetry;
 
-namespace Microsoft.Extensions.Hosting;
+namespace UT.MicroserviceEco.Host.ServiceDefaults;
 
 // Adds common Aspire services: service discovery, resilience, health checks, and OpenTelemetry.
 // This project should be referenced by each service project in your solution.
@@ -26,9 +24,9 @@ public static class Extensions
 
     public static TBuilder AddServiceDefaults<TBuilder>(this TBuilder builder) where TBuilder : IHostApplicationBuilder
     {
-
         builder.AddSerilogWithElasticsearch();
 
+        // Aspire Elasticsearch integration: health checks, OTel tracing, and ElasticsearchClient DI when orchestrated.
         var elasticsearchConnection = ((IConfiguration)builder.Configuration).GetConnectionString("elasticsearch");
         if (!string.IsNullOrWhiteSpace(elasticsearchConnection))
         {
