@@ -1,5 +1,5 @@
 export const environment = {
   production: true,
-  /** Base URL for API when the SPA is on a different host (Docker Compose + Traefik publish). */
+  /** Gateway origin (no `/api` suffix); `/api/*` paths are appended by the client. */
   apiBaseUrl: 'https://apigateway.ugurdemir.dev'
 };

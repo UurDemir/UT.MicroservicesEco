@@ -2,7 +2,6 @@ import { Injectable, computed, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
 import { Observable, tap } from 'rxjs';
-import { environment } from '../../../environments/environment';
 
 const TOKEN_KEY = 'ecommerce_access_token';
 
@@ -43,13 +42,8 @@ export class AuthService {
     private readonly router: Router
   ) {}
 
-  private api(path: string): string {
-    const base = environment.apiBaseUrl.replace(/\/$/, '');
-    return `${base}${path}`;
-  }
-
   login(body: LoginRequest): Observable<LoginResponse> {
-    return this.http.post<LoginResponse>(this.api('/api/auth/login'), body).pipe(
+    return this.http.post<LoginResponse>('/api/auth/login', body).pipe(
       tap((res) => {
         localStorage.setItem(TOKEN_KEY, res.accessToken);
         this.tokenSignal.set(res.accessToken);
@@ -58,7 +52,7 @@ export class AuthService {
   }
 
   register(body: RegisterRequest): Observable<unknown> {
-    return this.http.post(this.api('/api/auth/register'), body);
+    return this.http.post('/api/auth/register', body);
   }
 
   /** Clears session and navigates (default: storefront sign-in). */
