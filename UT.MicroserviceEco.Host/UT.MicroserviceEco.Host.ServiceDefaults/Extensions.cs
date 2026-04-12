@@ -24,6 +24,8 @@ public static class Extensions
 
     public static TBuilder AddServiceDefaults<TBuilder>(this TBuilder builder) where TBuilder : IHostApplicationBuilder
     {
+        ApplyUnsecuredElasticsearchConnectionOverride(builder);
+
         builder.AddSerilogWithElasticsearch();
 
         // Aspire Elasticsearch integration: health checks, OTel tracing, and ElasticsearchClient DI when orchestrated.
@@ -55,6 +57,34 @@ public static class Extensions
         // });
 
         return builder;
+    }
+
+    /// <summary>
+    /// With xpack.security disabled, credentials in the Aspire-generated connection string break the ES client health check.
+    /// Override to a plain http://elasticsearch:9200-style URI when stripping is enabled (same default as Serilog).
+    /// </summary>
+    private static void ApplyUnsecuredElasticsearchConnectionOverride(IHostApplicationBuilder builder)
+    {
+        var connectionString = builder.Configuration.GetConnectionString("elasticsearch");
+        if (string.IsNullOrWhiteSpace(connectionString))
+        {
+            return;
+        }
+
+        var stripAuth = builder.Configuration.GetValue("Serilog:Elasticsearch:StripAuthenticationCredentials", true);
+        if (!stripAuth)
+        {
+            return;
+        }
+
+        var normalized = ElasticsearchConnectionFormatter.ToUnauthenticatedHttpUri(connectionString);
+        if (builder.Configuration is IConfigurationManager configurationManager)
+        {
+            configurationManager.AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["ConnectionStrings:elasticsearch"] = normalized
+            });
+        }
     }
 
     public static TBuilder ConfigureOpenTelemetry<TBuilder>(this TBuilder builder) where TBuilder : IHostApplicationBuilder
@@ -104,8 +134,7 @@ public static class Extensions
     {
         // Adding health checks endpoints to applications in non-development environments has security implications.
         // See https://aka.ms/dotnet/aspire/healthchecks for details before enabling these endpoints in non-development environments.
-        if (app.Environment.IsDevelopment())
-        {
+       
             // All health checks must pass for app to be considered ready to accept traffic after starting
             app.MapHealthChecks(HealthEndpointPath);
 
@@ -113,8 +142,8 @@ public static class Extensions
             app.MapHealthChecks(AlivenessEndpointPath, new HealthCheckOptions
             {
                 Predicate = r => r.Tags.Contains("live")
-            });
-        }
+           });
+        
 
         return app;
     }

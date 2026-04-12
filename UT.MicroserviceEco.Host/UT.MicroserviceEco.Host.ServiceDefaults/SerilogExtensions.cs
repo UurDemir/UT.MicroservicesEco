@@ -65,21 +65,17 @@ internal static class SerilogExtensions
     /// </summary>
     private static Uri BuildElasticsearchSinkUri(string connectionString, bool stripAuthenticationCredentials)
     {
-        var s = connectionString.Trim();
+        if (stripAuthenticationCredentials)
+        {
+            return new Uri(ElasticsearchConnectionFormatter.ToUnauthenticatedHttpUri(connectionString));
+        }
 
-        // Aspire multi-scheme discovery uses a non-standard URI scheme that System.Uri cannot use for HTTP.
+        var s = connectionString.Trim();
         if (s.StartsWith("https+http://", StringComparison.OrdinalIgnoreCase))
         {
             s = "http://" + s["https+http://".Length..];
         }
 
-        var uriBuilder = new UriBuilder(s);
-        if (stripAuthenticationCredentials)
-        {
-            uriBuilder.UserName = "";
-            uriBuilder.Password = "";
-        }
-
-        return uriBuilder.Uri;
+        return new UriBuilder(s).Uri;
     }
 }

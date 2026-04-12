@@ -1,3 +1,5 @@
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+
 using UT.MicroserviceEco.ApiGateway.Configuration;
 using UT.MicroserviceEco.ApiGateway.Endpoints;
 using UT.MicroserviceEco.ApiGateway.Security;
@@ -62,5 +64,6 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapGatewayEndpoints();
+app.MapHealthChecks("/health", new HealthCheckOptions());
 app.MapDefaultEndpoints();
 app.Run();

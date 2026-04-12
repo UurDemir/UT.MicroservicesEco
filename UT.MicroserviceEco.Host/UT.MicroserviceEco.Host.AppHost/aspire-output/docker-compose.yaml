@@ -158,6 +158,8 @@ services:
     expose:
       - "${AUTHSERVICE_PORT}"
     depends_on:
+      postgres:
+        condition: "service_started"
       elasticsearch:
         condition: "service_started"
       otel-collector:
@@ -185,6 +187,8 @@ services:
     expose:
       - "${PRODUCTSERVICE_PORT}"
     depends_on:
+      postgres:
+        condition: "service_started"
       elasticsearch:
         condition: "service_started"
       otel-collector:
@@ -215,6 +219,10 @@ services:
     expose:
       - "${BASKETSERVICE_PORT}"
     depends_on:
+      postgres:
+        condition: "service_started"
+      productservice:
+        condition: "service_started"
       elasticsearch:
         condition: "service_started"
       otel-collector:
@@ -251,6 +259,10 @@ services:
     expose:
       - "${ORDERSERVICE_PORT}"
     depends_on:
+      postgres:
+        condition: "service_started"
+      rabbitmq:
+        condition: "service_started"
       elasticsearch:
         condition: "service_started"
       otel-collector:
@@ -284,6 +296,10 @@ services:
     expose:
       - "${DELIVERYSERVICE_PORT}"
     depends_on:
+      postgres:
+        condition: "service_started"
+      rabbitmq:
+        condition: "service_started"
       elasticsearch:
         condition: "service_started"
       otel-collector:
@@ -318,6 +334,16 @@ services:
     expose:
       - "8080"
     depends_on:
+      authservice:
+        condition: "service_started"
+      productservice:
+        condition: "service_started"
+      basketservice:
+        condition: "service_started"
+      orderservice:
+        condition: "service_started"
+      deliveryservice:
+        condition: "service_started"
       elasticsearch:
         condition: "service_started"
       otel-collector:
