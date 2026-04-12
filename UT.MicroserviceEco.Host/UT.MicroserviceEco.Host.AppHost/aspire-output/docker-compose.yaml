@@ -1,6 +1,8 @@
 services:
   compose-dashboard:
     image: "mcr.microsoft.com/dotnet/nightly/aspire-dashboard:latest"
+    environment:
+      ASPIRE_DASHBOARD_FORWARDEDHEADERS_ENABLED: "true"
     ports:
       - "18888"
     expose:
@@ -155,6 +157,7 @@ services:
       OTEL_EXPORTER_OTLP_ENDPOINT: "http://compose-dashboard:18889"
       OTEL_EXPORTER_OTLP_PROTOCOL: "grpc"
       OTEL_SERVICE_NAME: "authservice"
+      Jwt__Key: "${JWT_KEY}"
     expose:
       - "${AUTHSERVICE_PORT}"
     depends_on:
@@ -331,6 +334,7 @@ services:
       OTEL_EXPORTER_OTLP_ENDPOINT: "http://compose-dashboard:18889"
       OTEL_EXPORTER_OTLP_PROTOCOL: "grpc"
       OTEL_SERVICE_NAME: "apigateway"
+      Jwt__Key: "${JWT_KEY}"
     expose:
       - "8080"
     depends_on:
@@ -376,7 +380,7 @@ services:
     volumes:
       - type: "bind"
         target: "/etc/nginx/ssl"
-        source: "${REVERSE_PROXY_BINDMOUNT_0}"
+        source: "${REVERSE_PROXY_BINDMOUNT:-./ssl}"
         read_only: true
     depends_on:
       jaeger:
@@ -390,6 +394,8 @@ services:
       apigateway:
         condition: "service_started"
       ecommerce-web:
+        condition: "service_started"
+      compose-dashboard:
         condition: "service_started"
     networks:
       - "aspire"

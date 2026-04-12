@@ -1,11 +1,15 @@
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
 using Aspire.Hosting.Docker;
+using Aspire.Hosting.Docker.Resources.ServiceNodes;
 using UT.MicroserviceEco.Host.AppHost;
 
 var builder = DistributedApplication.CreateBuilder(args);
 Func<string, string> obsPath = relative => Path.GetFullPath(relative, builder.AppHostDirectory);
-Directory.CreateDirectory(obsPath("Observability/reverse-proxy/ssl"));
+
+// TLS PEMs are never committed: use env REVERSE_PROXY_BINDMOUNT (absolute or relative to AppHost) or default gitignored folder.
+var reverseProxySslHostPath = ReverseProxySslHostPath(Environment.GetEnvironmentVariable("REVERSE_PROXY_BINDMOUNT"), builder.AppHostDirectory);
+Directory.CreateDirectory(reverseProxySslHostPath);
 
 builder.AddDockerComposeEnvironment("compose")
     .WithDashboard(dashboard => dashboard.WithForwardedHeaders(true));
@@ -250,7 +254,7 @@ builder.AddContainer("reverse-proxy", "nginx", "1.27-alpine")
             SourcePath = obsPath("Observability/reverse-proxy/ssl-params.conf"),
         },
     ])
-    .WithBindMount(obsPath("Observability/reverse-proxy/ssl"), "/etc/nginx/ssl", isReadOnly: true)
+    .WithBindMount(reverseProxySslHostPath, "/etc/nginx/ssl", isReadOnly: true)
     .WaitFor(jaeger)
     .WaitFor(prometheus)
     .WaitFor(grafana)
@@ -260,6 +264,31 @@ builder.AddContainer("reverse-proxy", "nginx", "1.27-alpine")
     .WithHttpEndpoint(targetPort: 80, port: 80)
     .WithHttpsEndpoint(targetPort: 443, port: 443)
     .WithExternalHttpEndpoints()
-    .PublishAsDockerComposeService((_, s) => DockerComposePublishingExtensions.EnsureComposeDependsOn(s, "compose-dashboard"));
+    .PublishAsDockerComposeService((_, s) =>
+    {
+        // Published compose: mount path from .env only (no Aspire-generated REVERSE_PROXY_BINDMOUNT_0).
+        s.Volumes?.Clear();
+        s.AddVolume(new Volume
+        {
+            Name = "reverse-proxy-ssl",
+            Type = "bind",
+            Source = "${REVERSE_PROXY_BINDMOUNT:-./ssl}",
+            Target = "/etc/nginx/ssl",
+            ReadOnly = true,
+        });
+        DockerComposePublishingExtensions.EnsureComposeDependsOn(s, "compose-dashboard");
+    });
 
 builder.Build().Run();
+
+static string ReverseProxySslHostPath(string? envPath, string appHostDirectory)
+{
+    if (string.IsNullOrWhiteSpace(envPath))
+    {
+        return Path.GetFullPath(Path.Combine(appHostDirectory, "Observability", "reverse-proxy", "ssl"));
+    }
+
+    return Path.IsPathRooted(envPath)
+        ? Path.GetFullPath(envPath)
+        : Path.GetFullPath(Path.Combine(appHostDirectory, envPath));
+}

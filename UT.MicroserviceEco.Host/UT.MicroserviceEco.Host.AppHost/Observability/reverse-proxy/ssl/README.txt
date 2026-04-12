@@ -1,6 +1,8 @@
-Place TLS files here for local Aspire runs (bind-mounted into nginx):
-  fullchain.pem  — Cloudflare Origin Certificate (PEM) or public cert chain
-  privkey.pem    — matching private key
+TLS files are not committed (*.pem is gitignored).
 
-Cloudflare: SSL/TLS > Origin Server > Create certificate, copy PEM + key.
-Published Compose: set REVERSE_PROXY_BINDMOUNT_0=./ssl in .env (see deploy/env.example) and put these files in that folder on the server.
+Local Aspire: default mount is this folder, or set env REVERSE_PROXY_BINDMOUNT to any directory with:
+  fullchain.pem  — origin / LE public chain
+  privkey.pem    — private key
+
+Published Compose: set REVERSE_PROXY_BINDMOUNT in .env (e.g. ./ssl next to docker-compose.yaml); same file names.
+Cloudflare: SSL/TLS > Origin Server > Create certificate.
