@@ -151,7 +151,11 @@ var authService = builder.AddProject<Projects.UT_MicroserviceEco_AuthService>("a
     .WaitFor(postgres)
     .WaitFor(elasticsearch)
     .WithOtlpExporter(otelCollector)
-    .PublishAsDockerComposeService((_, s) => DockerComposePublishingExtensions.EnsureComposeDependsOn(s, "postgres"));
+    .PublishAsDockerComposeService((_, s) =>
+    {
+        DockerComposePublishingExtensions.EnsureComposeDependsOn(s, "postgres");
+        s.Environment["Jwt__Key"] = "${JWT_KEY}";
+    });
 
 var productService = builder.AddProject<Projects.UT_MicroserviceEco_ProductService>("productservice")
     .WithReference(productDb)
@@ -209,6 +213,7 @@ var apiGateway = builder.AddProject<Projects.UT_MicroserviceEco_ApiGateway>("api
     .PublishAsDockerComposeService((_, service) =>
     {
         service.Environment["HTTP_PORTS"] = "8080";
+        service.Environment["Jwt__Key"] = "${JWT_KEY}";
         service.Expose.Clear();
         service.Expose.Add("8080");
         DockerComposePublishingExtensions.EnsureComposeDependsOn(service,
