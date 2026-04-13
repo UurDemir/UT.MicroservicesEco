@@ -75,8 +75,8 @@ var prometheus = builder.AddContainer("prometheus", "prom/prometheus", "v2.52.0"
 var grafana = builder.AddContainer("grafana", "grafana/grafana", "11.0.0")
     .WithEnvironment("GF_SECURITY_ADMIN_USER", "admin")
     .WithEnvironment("GF_SECURITY_ADMIN_PASSWORD", "admin")
-    .WithEnvironment("GF_SERVER_ROOT_URL", "https://grafana.ugurdemir.dev/")
-    .WithEnvironment("GF_SERVER_DOMAIN", "grafana.ugurdemir.dev")
+    .WithEnvironment("GF_SERVER_ROOT_URL", "https://graf.ugurdemir.dev/")
+    .WithEnvironment("GF_SERVER_DOMAIN", "graf.ugurdemir.dev")
     .WithContainerFiles(
         "/etc/grafana/provisioning",
         ContainerDirectory.GetFileSystemItemsFromPath(
