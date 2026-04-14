@@ -15,9 +15,9 @@ internal sealed class BasketMetrics
         _itemsRemoved = meter.CreateCounter<long>("ecommerce.basket.items.removed", description: "Basket line items removed");
     }
 
-    public void ItemAdded() => _itemsAdded.Add(1);
+    public void ItemAdded(int count) => _itemsAdded.Add(count);
 
-    public void ItemUpdated() => _itemsUpdated.Add(1);
+    public void ItemUpdated(int count) => _itemsUpdated.Add(count);
 
-    public void ItemRemoved() => _itemsRemoved.Add(1);
+    public void ItemRemoved(int count) => _itemsRemoved.Add(count);
 }

@@ -1,11 +1,12 @@
-using UT.MicroserviceEco.BasketService.Domain;
-using UT.MicroserviceEco.ProductService.Sdk;
+using Elastic.Clients.Elasticsearch.Requests;
 
 using Microsoft.EntityFrameworkCore;
 
 using UT.MicroserviceEco.BasketService.Contracts;
+using UT.MicroserviceEco.BasketService.Domain;
 using UT.MicroserviceEco.BasketService.Infrastructure;
 using UT.MicroserviceEco.BasketService.Telemetry;
+using UT.MicroserviceEco.ProductService.Sdk;
 
 namespace UT.MicroserviceEco.BasketService.Endpoints;
 
@@ -73,7 +74,7 @@ internal static class BasketEndpoints
 
         dbContext.BasketItems.Add(item);
         await dbContext.SaveChangesAsync(cancellationToken);
-        metrics.ItemAdded();
+        metrics.ItemAdded(request.Quantity);
         logger.LogInformation(
             "Basket item added for {UserName} product {ProductId} line {ItemId}",
             item.UserName,
@@ -118,7 +119,7 @@ internal static class BasketEndpoints
         item.UnitPrice = product.Price;
         item.ProductName = product.Name;
         await dbContext.SaveChangesAsync(cancellationToken);
-        metrics.ItemUpdated();
+        metrics.ItemUpdated(request.Quantity);
         logger.LogInformation("Basket item updated {ItemId} qty {Quantity}", id, request.Quantity);
         return Results.Ok(item);
     }
@@ -134,10 +135,11 @@ internal static class BasketEndpoints
         {
             return Results.NotFound();
         }
-
+        
+        var quantity = item.Quantity;
         dbContext.BasketItems.Remove(item);
         await dbContext.SaveChangesAsync();
-        metrics.ItemRemoved();
+        metrics.ItemRemoved(quantity);
         logger.LogInformation("Basket item removed {ItemId}", id);
         return Results.NoContent();
     }
